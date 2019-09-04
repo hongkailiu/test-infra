@@ -5,8 +5,16 @@ k8s_object(
     name = "prow_prometheusrule",
     cluster = "{STABLE_PROW_CLUSTER}",
     kind = None,
-    template = "//prow/cluster/monitoring/mixins/prometheus:prow_prometheusrule",
+    template = ":prow_prometheusrule_yaml",
     visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "prow_prometheusrule_yaml",
+    srcs = ["//prow/cluster/monitoring/mixins/prometheus:prow_prometheusrule",],
+    tools = ["@gojsontoyaml//file",],
+    outs = ["prow_prometheusrule.yaml"],
+    cmd = "cat $(location //prow/cluster/monitoring/mixins/prometheus:prow_prometheusrule) | $(location @gojsontoyaml//file) > $@",
 )
 
 filegroup(

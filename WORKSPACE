@@ -255,3 +255,10 @@ http_archive(
 load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_repositories")
 
 jsonnet_repositories()
+
+http_file(
+   name = "gojsontoyaml",
+   urls = ["https://github.com/hongkailiu/gojsontoyaml/releases/download/e8bd32d/gojsontoyaml"],
+   sha256 = "45599af4b1f188f653ae5272ca8534e375ffe6032661d9ce4bf0362360753520",
+   executable = True,
+)
