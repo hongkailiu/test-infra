@@ -17,6 +17,9 @@ limitations under the License.
 package kube
 
 import (
+	"io/ioutil"
+	"os"
+	"path"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -153,4 +156,87 @@ func TestMergeConfigs(t *testing.T) {
 			}
 		})
 	}
+}
+
+const (
+	kubeConfig1 = `---
+apiVersion: v1
+clusters:
+- cluster:
+    insecure-skip-tls-verify: true
+    server: https://api.build01.ci.devcluster.openshift.com:6443
+  name: api-build01-ci-devcluster-openshift-com:6443
+contexts:
+- context:
+    cluster: api-build01-ci-devcluster-openshift-com:6443
+    namespace: ci
+    user: system:serviceaccount:ci:plank/api-build01-ci-devcluster-openshift-com:6443
+  name: ci/api-build01-ci-devcluster-openshift-com:6443
+current-context: ci/api-build01-ci-devcluster-openshift-com:6443
+kind: Config
+preferences: {}
+users:
+- name: system:serviceaccount:ci:plank/api-build01-ci-devcluster-openshift-com:6443
+  user:
+    token: foobar
+`
+)
+
+func TestKubeConfigs(t *testing.T) {
+
+	dir, err := ioutil.TempDir("", "test-")
+	if err != nil {
+		t.Fatal("failed to create temp dir")
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Fatalf("failed to remove temp dir: '%s'", dir)
+		}
+	}()
+
+	cases := []struct {
+		name             string
+		kubeConfigString string
+		kubeConfigPath   string
+		expectedConfigs  map[string]rest.Config
+		expectedContext  string
+		expectedErr      error
+	}{
+		{
+			name:             "kubeconfig with 1 context",
+			kubeConfigString: kubeConfig1,
+			kubeConfigPath:   path.Join(dir, "config1"),
+			expectedConfigs: map[string]rest.Config{
+				"ci/api-build01-ci-devcluster-openshift-com:6443": {
+					Host:        "https://api.build01.ci.devcluster.openshift.com:6443",
+					BearerToken: "foobar",
+					TLSClientConfig: rest.TLSClientConfig{
+						Insecure: true,
+					},
+				},
+			},
+			expectedContext: "ci/api-build01-ci-devcluster-openshift-com:6443",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := ioutil.WriteFile(tc.kubeConfigPath, []byte(kubeConfig1), 0644); err != nil {
+				t.Fatalf("failed to write kubeconfig file: '%s'", tc.kubeConfigPath)
+			}
+			actual, context, err := kubeConfigs(tc.kubeConfigPath)
+
+			if !equality.Semantic.DeepEqual(actual, tc.expectedConfigs) {
+				t.Errorf("configs do not match:\n%s", diff.ObjectReflectDiff(actual, tc.expectedConfigs))
+			}
+			if !equality.Semantic.DeepEqual(context, tc.expectedContext) {
+				t.Errorf("current contexts do not match:\n%s", diff.ObjectReflectDiff(context, tc.expectedContext))
+			}
+			if !equality.Semantic.DeepEqual(err, tc.expectedErr) {
+				t.Errorf("errors do not match:\n%s", diff.ObjectReflectDiff(err, tc.expectedErr))
+			}
+
+		})
+	}
+
 }
