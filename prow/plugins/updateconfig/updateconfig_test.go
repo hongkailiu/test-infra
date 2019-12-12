@@ -1200,6 +1200,66 @@ func TestUpdateConfig(t *testing.T) {
 	}
 }
 
+func TestFilterChanges(t *testing.T) {
+	log := logrus.WithField("test", "TestFilterChanges")
+	testcases := []struct {
+		name     string
+		cfg      plugins.ConfigUpdater
+		changes  []github.PullRequestChange
+		log      *logrus.Entry
+		expected map[plugins.ConfigMapID][]ConfigMapUpdate
+	}{
+		{
+			name: "default name space is handled properly",
+			cfg: plugins.ConfigUpdater{
+				Maps: map[string]plugins.ConfigMapSpec{
+					"prow/config.yaml": {
+						Name: "config",
+					},
+					"prow/plugins.yaml": {
+						Name: "plugins",
+						Key:  "test-key",
+					},
+					"config/foo.yaml": {
+						Name: "multikey-config",
+						Clusters: map[string][]string{
+							"default": {defaultNamespace},
+						},
+					},
+					"config/bar.yaml": {
+						Name: "multikey-config",
+					},
+				},
+			},
+			changes: []github.PullRequestChange{
+				{
+					Filename: "config/foo.yaml",
+					Status:   github.PullRequestFileAdded,
+				},
+				{
+					Filename: "config/bar.yaml",
+					Status:   github.PullRequestFileAdded,
+				},
+			},
+			log: log,
+			expected: map[plugins.ConfigMapID][]ConfigMapUpdate{
+				{Name: "multikey-config", Namespace: "default", Cluster: "default"}: {
+					{Key: "foo.yaml", Filename: "config/foo.yaml"},
+					{Key: "bar.yaml", Filename: "config/bar.yaml"},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		tc.cfg.SetDefaults()
+		actual := FilterChanges(tc.cfg, tc.changes, tc.log)
+		if !equality.Semantic.DeepEqual(tc.expected, actual) {
+			t.Errorf("%s: incorrect changes: %v", tc.name, diff.ObjectReflectDiff(tc.expected, actual))
+		}
+	}
+}
+
 func TestUpdate(t *testing.T) {
 
 	testcases := []struct {
