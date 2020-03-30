@@ -50,6 +50,7 @@ var (
 )
 
 type jobLabel struct {
+	jobCluster   string
 	jobNamespace string
 	jobName      string
 	jobType      string
@@ -60,7 +61,7 @@ type jobLabel struct {
 }
 
 func (jl *jobLabel) values() []string {
-	return []string{jl.jobNamespace, jl.jobName, jl.jobType, jl.state, jl.org, jl.repo, jl.baseRef}
+	return []string{jl.jobCluster, jl.jobNamespace, jl.jobName, jl.jobType, jl.state, jl.org, jl.repo, jl.baseRef}
 }
 
 func init() {
@@ -78,7 +79,7 @@ func getJobLabelMap(pjs []prowapi.ProwJob) map[jobLabel]float64 {
 }
 
 func getJobLabel(pj prowapi.ProwJob) jobLabel {
-	jl := jobLabel{jobNamespace: pj.Namespace, jobName: pj.Spec.Job, jobType: string(pj.Spec.Type), state: string(pj.Status.State)}
+	jl := jobLabel{jobCluster: pj.Spec.Cluster, jobNamespace: pj.Namespace, jobName: pj.Spec.Job, jobType: string(pj.Spec.Type), state: string(pj.Status.State)}
 
 	if pj.Spec.Refs != nil {
 		jl.org = pj.Spec.Refs.Org
